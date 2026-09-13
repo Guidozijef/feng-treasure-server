@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { success } from '../utils/response.js';
-import { getCollectionFullList, getCollectionOne, createRecord } from '../db/pb.js';
+import { success, error } from '../utils/response.js';
+import { getCollectionFullList, getCollectionOne, createRecord, pb } from '../db/pb.js';
 
 export const vipRouter = new Hono();
 
@@ -22,7 +22,7 @@ vipRouter.get('/faqs', async (c) => {
   return c.json(success(items));
 });
 
-// 创建 VIP 订单 (直接写入 PocketBase vip_orders 表)
+// 创建 VIP 订单 (直接写入 PocketBase vip_orders 表，并实时激活用户特权)
 vipRouter.post('/create-order', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { planId, uid } = body;
@@ -37,15 +37,30 @@ vipRouter.post('/create-order', async (c) => {
     plan_id: planId || 'year',
     plan_name: planName,
     price,
-    uid: uid || '8932014',
+    uid: uid || '',
     pay_status: 'paid'
   });
+
+  // 如果传了用户 uid，同步更新 user_profiles 对应记录的 VIP 状态
+  if (uid) {
+    try {
+      const user = await pb.collection('user_profiles').getFirstListItem(`uid = "${uid}"`);
+      if (user) {
+        await pb.collection('user_profiles').update(user.id, {
+          isSvip: true,
+          vipPlanName: planName,
+          vipBadge: '⚡ SVIP',
+          vipExpireDate: planId === 'forever' ? '终身永久有效' : '2027-09-13 到期'
+        });
+      }
+    } catch {}
+  }
 
   return c.json(success({
     orderNo,
     planName,
     amount: price,
-    expireDate: planId === 'forever' ? '终身永久有效' : '2026-09-13 到期',
+    expireDate: planId === 'forever' ? '终身永久有效' : '2027-09-13 到期',
     status: 'paid',
     message: `恭喜！订单已入库，成功开通【${planName}】`
   }));
