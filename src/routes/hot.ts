@@ -1,75 +1,77 @@
 import { Hono } from 'hono';
 import { success } from '../utils/response.js';
-import { MOCK_RESOURCES } from '../utils/mockData.js';
 import { getCollectionList } from '../db/pb.js';
 
 export const hotRouter = new Hono();
 
-// 获取排行榜单 (支持 tab 维度: soar(总榜飙升) | week(本周热门) | new(今日新上) | rating(评分最高))
+// 获取排行榜单 (纯从 PocketBase resources 统计)
 hotRouter.get('/rankings', async (c) => {
   const tab = c.req.query('tab') || 'soar';
   const cat = c.req.query('category') || 'all';
 
-  const { items } = await getCollectionList('resources', MOCK_RESOURCES);
-  let list = [...items];
-
+  let filter = '';
   if (cat && cat !== 'all') {
-    list = list.filter(item => item.category === cat);
+    filter = `category = "${cat}"`;
   }
 
+  let sort = '-downloads';
   if (tab === 'rating') {
-    list.sort((a, b) => b.rating - a.rating);
+    sort = '-rating';
   } else if (tab === 'new') {
-    list.sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime());
-  } else {
-    list.sort((a, b) => b.downloads - a.downloads);
+    sort = '-publishDate';
   }
 
-  const top1 = list[0] ? {
-    id: list[0].id,
+  const { items } = await getCollectionList<any>('resources', {
+    filter,
+    sort,
+    perPage: 15
+  });
+
+  const top1 = items[0] ? {
+    id: items[0].id,
     rankBadge: 'TOP 1 冠军榜首',
-    heat: '98.6w',
-    title: list[0].title,
-    fullTitle: list[0].fullTitle,
-    version: list[0].version,
-    tag: list[0].versionBadge || '免安装绿色版',
-    desc: list[0].desc,
-    rating: `${list[0].rating} 分`,
-    size: list[0].size,
+    heat: `${Math.round((items[0].downloads || 50000) / 1000)}w`,
+    title: items[0].title,
+    fullTitle: items[0].fullTitle || items[0].title,
+    version: items[0].version,
+    tag: items[0].versionBadge || '免安装绿色版',
+    desc: items[0].desc,
+    rating: `${items[0].rating} 分`,
+    size: items[0].size,
     source: '网盘高速直链',
-    link: list[0].panUrl,
-    code: list[0].pwd
+    link: items[0].panUrl,
+    code: items[0].pwd
   } : null;
 
-  const top2 = list[1] ? {
-    id: list[1].id,
+  const top2 = items[1] ? {
+    id: items[1].id,
     rankBadge: 'TOP 2',
-    heat: '89.2w',
-    icon: list[1].icon,
-    title: list[1].title,
-    sub: list[1].versionBadge,
-    desc: list[1].desc,
+    heat: `${Math.round((items[1].downloads || 40000) / 1000)}w`,
+    icon: items[1].icon,
+    title: items[1].title,
+    sub: items[1].versionBadge,
+    desc: items[1].desc,
     tag: '稳定无弹窗',
     source: '网盘极速直链',
-    link: list[1].panUrl,
-    code: list[1].pwd
+    link: items[1].panUrl,
+    code: items[1].pwd
   } : null;
 
-  const top3 = list[2] ? {
-    id: list[2].id,
+  const top3 = items[2] ? {
+    id: items[2].id,
     rankBadge: 'TOP 3',
-    heat: '76.5w',
-    icon: list[2].icon,
-    title: list[2].title,
-    sub: list[2].versionBadge,
-    desc: list[2].desc,
+    heat: `${Math.round((items[2].downloads || 30000) / 1000)}w`,
+    icon: items[2].icon,
+    title: items[2].title,
+    sub: items[2].versionBadge,
+    desc: items[2].desc,
     tag: '国内高速源',
-    source: 'Quark网盘',
-    link: list[2].panUrl,
-    code: list[2].pwd
+    source: '网盘高速',
+    link: items[2].panUrl,
+    code: items[2].pwd
   } : null;
 
-  const rankList = list.slice(3, 10).map((item, idx) => ({
+  const rankList = items.slice(3, 10).map((item, idx) => ({
     rank: String(idx + 4).padStart(2, '0'),
     id: item.id,
     title: item.title,
@@ -77,7 +79,7 @@ hotRouter.get('/rankings', async (c) => {
     tag: item.versionBadge || '开箱即用',
     tagClass: idx % 3 === 0 ? 'tag-blue' : idx % 3 === 1 ? 'tag-green' : 'tag-amber',
     rating: String(item.rating),
-    heat: `${Math.round(item.downloads / 1000)}w热度`,
+    heat: `${Math.round((item.downloads || 10000) / 1000)}w热度`,
     size: item.size,
     icon: item.icon,
     source: '网盘高速直达',

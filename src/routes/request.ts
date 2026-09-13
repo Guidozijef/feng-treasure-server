@@ -4,7 +4,7 @@ import { createRecord, getCollectionList } from '../db/pb.js';
 
 export const requestRouter = new Hono();
 
-// 获取求资源的基础配置
+// 获取求资源的基础选项
 requestRouter.get('/config', (c) => {
   return c.json(success({
     categories: [
@@ -27,13 +27,13 @@ requestRouter.get('/config', (c) => {
   }));
 });
 
-// 提交求资源工单
+// 提交求资源工单 (直接写入 PocketBase resource_requests 表)
 requestRouter.post('/submit', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { resourceName, category, platforms, detailDesc, screenshots, isSvipSpeedEnabled } = body;
 
   if (!resourceName || !resourceName.trim()) {
-    return c.json(error('请输入希望获取的资源名称', 400));
+    return c.json(error('请输入资源名称', 400));
   }
 
   const orderNo = '2025' + Math.floor(100000 + Math.random() * 900000);
@@ -47,7 +47,10 @@ requestRouter.post('/submit', async (c) => {
     is_svip_speed: !!isSvipSpeedEnabled,
     status: 'pending',
     status_text: isSvipSpeedEnabled ? 'SVIP极速寻档中' : '全网寻档中 · 专人处理',
-    created: new Date().toISOString()
+    statusClass: 'status-pending',
+    statusIcon: '↻',
+    subDesc: isSvipSpeedEnabled ? '专人特派通道加速中，预计30分钟内完成' : '极客巡检工程师已接单，正在全网检索',
+    time: '刚刚'
   });
 
   return c.json(success({
@@ -55,44 +58,13 @@ requestRouter.post('/submit', async (c) => {
     orderNo,
     title: resourceName.trim(),
     statusText: isSvipSpeedEnabled ? 'SVIP极速寻档中' : '全网寻档中 · 专人处理',
-    message: '求档需求已立案，工程师已接单处理'
+    message: '工单已写入数据库，寻档完成后即刻上架'
   }));
 });
 
-// 获取我的求档历史
+// 获取我的求档历史 (直接从 PocketBase resource_requests 查询)
 requestRouter.get('/history', async (c) => {
-  const defaultHistory = [
-    {
-      id: 101,
-      orderNo: '2024051801',
-      time: '2小时前',
-      status: 'done',
-      statusClass: 'status-done',
-      statusIcon: '✔',
-      statusText: '寻档完成 · 已上架',
-      title: 'DeepSeek 开发者私有化知识库部署套件',
-      subDesc: '格式：Docker Compose 源码脚本 / macOS + Win',
-      category: '开源源码',
-      platforms: 'macOS, Win',
-      targetResId: 'cursor-ai'
-    },
-    {
-      id: 102,
-      orderNo: '2024051608',
-      time: '昨天 16:42',
-      status: 'pending',
-      statusClass: 'status-pending',
-      statusIcon: '↻',
-      statusText: '全网寻档中 · 专人处理',
-      title: 'Final Cut Pro 电影级调色预设包 2025版',
-      subDesc: '极客工程师 @枫木 已接受委托，正在套取校验',
-      category: '设计素材',
-      platforms: 'macOS',
-      targetResId: null
-    }
-  ];
-
-  const { items } = await getCollectionList('resource_requests', defaultHistory);
+  const { items } = await getCollectionList('resource_requests', { perPage: 20 });
   return c.json(success(items));
 });
 

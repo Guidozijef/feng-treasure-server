@@ -4,7 +4,7 @@ import { createRecord, getCollectionList } from '../db/pb.js';
 
 export const feedbackRouter = new Hono();
 
-// 获取失效问题分类与渠道选项
+// 获取失效问题选项
 feedbackRouter.get('/types', (c) => {
   return c.json(success({
     issueTypes: [
@@ -25,7 +25,7 @@ feedbackRouter.get('/types', (c) => {
   }));
 });
 
-// 提交资源失效反馈报告
+// 提交失效报告 (直接写入 PocketBase resource_reports 表)
 feedbackRouter.post('/report', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { resourceId, resourceTitle, issueType, channels, detailText, screenshots, noticeEnabled } = body;
@@ -43,43 +43,27 @@ feedbackRouter.post('/report', async (c) => {
     screenshots: Array.isArray(screenshots) ? screenshots.join(',') : '',
     notice_enabled: !!noticeEnabled,
     status: 'pending',
-    created: new Date().toISOString()
+    status_text: '专人寻找校验中',
+    statusType: 'pending',
+    time: '刚刚'
   });
 
   return c.json(success({
     reportId: record.id,
     status: 'pending',
     statusText: '专人寻找校验中',
-    message: '反馈已成功受理，进入极速补档排期'
+    message: '反馈已成功录入数据库，技术专人进入补档排期'
   }));
 });
 
-// 获取我的反馈进展列表
+// 获取我的失效反馈记录 (直接从 PocketBase resource_reports 查询)
 feedbackRouter.get('/history', async (c) => {
-  const defaultHistory = [
-    {
-      id: 'fb-1',
-      title: 'Navicat Premium 16.3 数据库客户端',
-      statusType: 'success',
-      statusText: '已成功补档',
-      time: '今天 11:20',
-      token: '百度网盘提取码：geek2025 | 夸克直链：https://pan.quark.cn/s/navicat16'
-    },
-    {
-      id: 'fb-2',
-      title: 'Cursor AI 高级工作流模板',
-      statusType: 'pending',
-      statusText: '专人寻找校验中',
-      time: '昨天 19:40'
-    }
-  ];
-
-  const { items } = await getCollectionList('resource_reports', defaultHistory);
+  const { items } = await getCollectionList('resource_reports', { perPage: 20 });
   return c.json(success(items));
 });
 
-// 催促进度
+// 催办
 feedbackRouter.post('/urge', async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(success({ urged: true }, `已向工程师加急催促【${body.title || '该工单'}】！`));
+  return c.json(success({ urged: true }, `已向工程师加急催促【${body.title || '工单'}】！`));
 });
