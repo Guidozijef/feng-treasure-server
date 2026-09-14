@@ -1,3 +1,16 @@
+/**
+ * 获取北京时间 (UTC+8) 的 YYYY-MM-DD 日期字符串，确保按自然日精准限制一天只能打卡一次
+ */
+export function getBeijingDateString(): string {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const bj = new Date(utc + 8 * 3600000);
+  const y = bj.getFullYear();
+  const m = String(bj.getMonth() + 1).padStart(2, '0');
+  const d = String(bj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 import { Hono } from 'hono';
 import crypto from 'crypto';
 import { success, error } from '../utils/response.js';
@@ -127,6 +140,17 @@ userRouter.post('/login', async (c) => {
     profile.privilegeStatus = '普通用户 · 开通会员享全站满速下载';
   }
 
+  // 附带今日打卡状态
+  const todayLogin = getBeijingDateString();
+  try {
+    const checkLogin = await getCollectionList('user_checkins', {
+      filter: `uid = "${profile.uid}" && date = "${todayLogin}"`
+    });
+    profile.isCheckIn = checkLogin.total > 0;
+  } catch {
+    profile.isCheckIn = false;
+  }
+
   return c.json(
     success(
       {
@@ -193,6 +217,17 @@ userRouter.get('/profile', async (c) => {
     return c.json(error('未查询到该用户档案', 404));
   }
 
+  // 查询今日打卡状态，同步给前端控制“已打卡/立即打卡”按钮
+  const today = getBeijingDateString();
+  try {
+    const check = await getCollectionList('user_checkins', {
+      filter: `uid = "${profile.uid}" && date = "${today}"`
+    });
+    profile.isCheckIn = check.total > 0;
+  } catch {
+    profile.isCheckIn = false;
+  }
+
   // 严格根据 isSvip 状态校验：未购买会员的用户展示普通用户信息，绝不展示 SVIP 标识
   if (!profile.isSvip) {
     profile.isSvip = false;
@@ -205,7 +240,7 @@ userRouter.get('/profile', async (c) => {
   return c.json(success(profile));
 });
 
-// 每日签到打卡 (写入 user_checkins 并更新对应 uid 的积分)
+// 每日签到打卡 (写入 user_checkins，严格校验一天仅限打卡一次)
 userRouter.post('/checkin', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const uid = body.uid || c.req.query('uid');
@@ -214,16 +249,27 @@ userRouter.post('/checkin', async (c) => {
     return c.json(error('打卡需要提供用户 uid', 400));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getBeijingDateString();
 
   try {
+    // 严格校验今日是否已在数据库打过卡
     const check = await getCollectionList('user_checkins', {
       filter: `uid = "${uid}" && date = "${today}"`
     });
     if (check.total > 0) {
-      return c.json(success({ isCheckIn: true }, '今日已在数据库完成打卡'));
+      return c.json(
+        success(
+          {
+            isCheckIn: true,
+            alreadyChecked: true,
+            addedPoints: 0
+          },
+          '今日已完成打卡，请勿重复打卡'
+        )
+      );
     }
 
+    // 写入打卡记录流水
     await createRecord('user_checkins', {
       uid,
       points_awarded: 5,
@@ -241,6 +287,7 @@ userRouter.post('/checkin', async (c) => {
       success(
         {
           isCheckIn: true,
+          alreadyChecked: false,
           addedPoints: 5,
           currentPoints
         },
