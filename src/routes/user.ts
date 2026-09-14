@@ -119,6 +119,14 @@ userRouter.post('/login', async (c) => {
     profile = await pb.collection('user_profiles').update(profile.id, { uid });
   }
 
+  if (!profile.isSvip) {
+    profile.isSvip = false;
+    profile.vipBadge = '普通用户';
+    profile.vipPlanName = '';
+    profile.vipExpireDate = '';
+    profile.privilegeStatus = '普通用户 · 开通会员享全站满速下载';
+  }
+
   return c.json(
     success(
       {
@@ -191,9 +199,7 @@ userRouter.get('/profile', async (c) => {
     profile.vipBadge = '普通用户';
     profile.vipPlanName = '';
     profile.vipExpireDate = '';
-    if (!profile.privilegeStatus || profile.privilegeStatus.includes('特权生效中')) {
-      profile.privilegeStatus = '普通用户 · 开通会员享全站满速下载';
-    }
+    profile.privilegeStatus = '普通用户 · 开通会员享全站满速下载';
   }
 
   return c.json(success(profile));
