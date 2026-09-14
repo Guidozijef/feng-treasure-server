@@ -50,7 +50,8 @@ resourcesRouter.get('/', async (c) => {
   return c.json(success(items, 'success', total));
 });
 
-// 获取资源详情 (纯数据库读取)
+
+// 获取资源详情 (纯数据库读取，数据全部来自 PocketBase 数据库，零写死)
 resourcesRouter.get('/:id', async (c) => {
   const id = c.req.param('id');
   const item = await getCollectionOne('resources', id);
