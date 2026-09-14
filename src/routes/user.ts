@@ -98,16 +98,16 @@ userRouter.post('/login', async (c) => {
         openid,
         nickName: body.nickName || '极客探索者',
         avatar: body.avatar || '/images/default_avatar.svg',
-        vipBadge: '⚡ SVIP',
-        privilegeStatus: '微信授权用户 · 极客特权生效中',
-        downloadCount: 48,
-        favCount: 126,
-        ticketCount: 2,
-        ticketHasNew: true,
-        points: 1280,
-        isSvip: true,
-        vipPlanName: '永久黑卡',
-        vipExpireDate: '终身永久有效'
+        vipBadge: '普通用户',
+        privilegeStatus: '普通用户 · 开通会员享全站满速下载',
+        downloadCount: 0,
+        favCount: 0,
+        ticketCount: 0,
+        ticketHasNew: false,
+        points: 50,
+        isSvip: false,
+        vipPlanName: '',
+        vipExpireDate: ''
       });
     } catch (err: any) {
       console.error('创建用户档案失败:', err?.message || err);
@@ -183,6 +183,17 @@ userRouter.get('/profile', async (c) => {
 
   if (!profile) {
     return c.json(error('未查询到该用户档案', 404));
+  }
+
+  // 严格根据 isSvip 状态校验：未购买会员的用户展示普通用户信息，绝不展示 SVIP 标识
+  if (!profile.isSvip) {
+    profile.isSvip = false;
+    profile.vipBadge = '普通用户';
+    profile.vipPlanName = '';
+    profile.vipExpireDate = '';
+    if (!profile.privilegeStatus || profile.privilegeStatus.includes('特权生效中')) {
+      profile.privilegeStatus = '普通用户 · 开通会员享全站满速下载';
+    }
   }
 
   return c.json(success(profile));

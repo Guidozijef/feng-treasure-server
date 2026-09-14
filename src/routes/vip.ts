@@ -41,16 +41,18 @@ vipRouter.post('/create-order', async (c) => {
     pay_status: 'paid'
   });
 
-  // 如果传了用户 uid，同步更新 user_profiles 对应记录的 VIP 状态
+  // 如果传了用户 uid，用户付款后同步更新 user_profiles 对应记录为 SVIP 会员状态
   if (uid) {
     try {
       const user = await pb.collection('user_profiles').getFirstListItem(`uid = "${uid}"`);
       if (user) {
+        const expireDate = planId === 'forever' ? '终身永久有效' : '2027-09-14 到期';
         await pb.collection('user_profiles').update(user.id, {
           isSvip: true,
           vipPlanName: planName,
           vipBadge: '⚡ SVIP',
-          vipExpireDate: planId === 'forever' ? '终身永久有效' : '2027-09-13 到期'
+          privilegeStatus: '极客黑卡尊享中 · 独家节点生效中',
+          vipExpireDate: expireDate
         });
       }
     } catch {}
