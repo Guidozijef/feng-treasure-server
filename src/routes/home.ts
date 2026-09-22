@@ -43,7 +43,7 @@ homeRouter.get('/recommendations', async (c) => {
   return c.json(success(items, 'success', total));
 });
 
-// 获取热门飙升榜 Top 3 (来自 PocketBase 的 resources 表下载量排名前三)
+// 获取热门飙升榜 Top 3 (来自 PocketBase 的 resources 表下载量排名前三，严格按热度自动展示)
 homeRouter.get('/top-picks', async (c) => {
   const { items } = await getCollectionList<any>('resources', {
     sort: '-downloads',
@@ -54,7 +54,9 @@ homeRouter.get('/top-picks', async (c) => {
     id: res.id,
     title: res.title,
     version: res.version,
-    badge: index === 0 ? 'TOP 1' : index === 1 ? 'TOP 2' : 'TOP 3',
+    rank: index + 1,
+    rankBadge: `TOP ${index + 1}`,
+    badge: res.badge || '',
     desc: `${res.platform || '全平台'} · ${res.size || '免安装'} · ${res.versionBadge || ''}`,
     downloads: res.downloadCountText || `${res.downloads} 人已获取`,
     icon: res.icon,
@@ -68,17 +70,21 @@ homeRouter.get('/top-picks', async (c) => {
 
 // 首页聚合总览数据 (完全从 PocketBase 数据库各表聚合)
 homeRouter.get('/overview', async (c) => {
-  const [banners, announcements, resources] = await Promise.all([
+  const [banners, announcements, hotResources, resources] = await Promise.all([
     getCollectionFullList('banners'),
     getCollectionFullList('announcements', { sort: '-publishDate' }),
+    getCollectionList<any>('resources', { sort: '-downloads', perPage: 3 }),
     getCollectionList<any>('resources', { sort: '-downloads', perPage: 10 })
   ]);
 
-  const topPicks = resources.items.slice(0, 3).map((res, index) => ({
+  // 热门飙升榜：严格取热度（下载量）最高的前三位，自动赋予 TOP 排名徽章，而非静态标签字段
+  const topPicks = hotResources.items.map((res, index) => ({
     id: res.id,
     title: res.title,
     version: res.version,
-    badge: index === 0 ? 'TOP 1' : index === 1 ? 'TOP 2' : 'TOP 3',
+    rank: index + 1,
+    rankBadge: `TOP ${index + 1}`,
+    badge: res.badge || '',
     desc: `${res.platform || '全平台'} · ${res.size || ''}`,
     downloads: res.downloadCountText || `${res.downloads} 人已获取`,
     icon: res.icon,
@@ -99,3 +105,4 @@ homeRouter.get('/overview', async (c) => {
     }
   }));
 });
+
