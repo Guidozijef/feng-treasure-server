@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { success } from '../utils/response.js';
 import { getCollectionList, getCollectionFullList } from '../db/pb.js';
+import { normalizeResourceItem } from './resources.js';
 
 export const homeRouter = new Hono();
 
@@ -40,7 +41,7 @@ homeRouter.get('/recommendations', async (c) => {
     perPage: 30
   });
 
-  return c.json(success(items, 'success', total));
+  return c.json(success(items.map(normalizeResourceItem), 'success', total));
 });
 
 // 获取热门飙升榜 Top 3 (来自 PocketBase 的 resources 表下载量排名前三，严格按热度自动展示)
@@ -97,7 +98,7 @@ homeRouter.get('/overview', async (c) => {
     banners,
     announcements,
     topPicks,
-    feedList: resources.items,
+    feedList: resources.items.map(normalizeResourceItem),
     stats: {
       totalResources: resources.total,
       totalDownloads: resources.items.reduce((sum, item) => sum + (item.downloads || 0), 0),
