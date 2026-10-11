@@ -84,13 +84,13 @@ export function normalizeResourceItem(item: any) {
     }).filter((t: any) => Boolean(t.text));
   }
 
-  // 保证 badge 字段和 tags 第一项保持一致
-  const primaryBadge = tags[0]?.text || item.badge || '';
+  // 严格保留独立的视觉角标文案 (badge)，若无则为空字符串，不强行覆盖
+  const badge = item.badge || '';
 
   return {
     ...item,
     tags,
-    badge: primaryBadge,
+    badge,
     // 废弃/冗余字段平滑对齐
     versionBadge: item.version || '',
     fullTitle: item.title || '',
